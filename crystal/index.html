@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="开场页面">
+    <title>开场 - 小岛</title>
+    
+    <!-- 样式表 -->
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            overflow: hidden;
+            background-color: black;
+        }
+
+        .fullscreen-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .fullscreen-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: opacity 0.3s ease;
+        }
+
+        .fullscreen-image:hover {
+            opacity: 0.9;
+        }
+
+        .click-hint {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-size: 18px;
+            text-align: center;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border-radius: 5px;
+            opacity: 0;
+            animation: fadeInOut 2s ease-in-out infinite;
+        }
+
+        @keyframes fadeInOut {
+            0%, 100% { opacity: 0; }
+            50% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <!-- 主要内容容器 -->
+    <div class="fullscreen-container" id="mainContainer">
+        <img src="开头.png" alt="开场图片" class="fullscreen-image" id="mainImage">
+        <div class="click-hint">点击任意位置继续</div>
+    </div>
+
+    <!-- 页面交互脚本 -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const container = document.getElementById('mainContainer');
+            const image = document.getElementById('mainImage');
+
+            // 确保图片加载完成
+            image.onload = function() {
+                container.style.opacity = 1;
+            };
+
+            // 点击事件处理
+            function handleClick() {
+                // 添加淡出效果
+                container.style.opacity = 0;
+                container.style.transition = 'opacity 0.5s ease';
+                
+                // 延迟跳转以等待动画完成
+                setTimeout(() => {
+                    window.location.href = '../crystal_ball.html';
+                }, 500);
+            }
+
+            // 添加点击事件监听
+            container.addEventListener('click', handleClick);
+        });
+    </script>
+</body>
+</html> 
