@@ -1,0 +1,2246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>悲伤小岛 - 音律</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: #000;
+        }
+        canvas { 
+            display: block; 
+        }
+        #p5-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 0;
+        }
+        #three-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            width: 100%;
+            text-align: center;
+            color: white;
+            font-family: Arial, sans-serif;
+            pointer-events: none;
+            z-index: 2;
+        }
+        #video-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 25vw;
+            aspect-ratio: 16/9;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            overflow: hidden;
+            z-index: 100;
+        }
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
+        #hand-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transform: scaleX(-1);
+        }
+        #status {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: white;
+            background-color: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 5px;
+            font-family: Arial, sans-serif;
+            z-index: 100;
+        }
+        .loading {
+            display: none;
+        }
+        #cursor {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 20px;
+            height: 20px;
+            pointer-events: none;
+            z-index: 1000;
+            will-change: transform;
+        }
+        #cursor::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 10px;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            box-shadow: 0 0 10px #fff,
+                       0 0 20px #fff,
+                       0 0 30px #fff;
+            animation: pulse 1.5s infinite;
+        }
+        #cursor::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            animation: ripple 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(1.5);
+                opacity: 0;
+            }
+        }
+        @keyframes ripple {
+            0% {
+                width: 20px;
+                height: 20px;
+                opacity: 1;
+            }
+            100% {
+                width: 40px;
+                height: 40px;
+                opacity: 0;
+            }
+        }
+        #audioStartButton {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 20px 40px;
+            font-size: 18px;
+            background-color: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid white;
+            border-radius: 10px;
+            cursor: pointer;
+            z-index: 1000;
+            transition: all 0.3s ease;
+        }
+        #audioStartButton:hover {
+            background-color: rgba(255, 255, 255, 0.3);
+        }
+        .hidden {
+            display: none !important;
+        }
+    </style>
+    <!-- 添加 MediaPipe 依赖 -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3/drawing_utils.js"></script>
+</head>
+<body>
+    <div id="info">悲伤小岛 · 手势交流</div>
+    <div id="status">正在进入悲伤小岛...</div>
+    <button id="audioStartButton">进入小岛</button>
+    <div id="video-container">
+    <video id="video" autoplay muted playsinline></video>
+        <canvas id="hand-canvas"></canvas>
+    </div>
+    <div id="cursor"></div>
+    <audio id="backgroundMusic" loop>
+        <source src="2424420349.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="crystalMusic1">
+        <source src="邓垚 - 诀别书.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="crystalMusic2">
+        <source src="风潮音乐 - 晨鸟之歌 (纯自然声音).mp3" type="audio/mpeg">
+    </audio>
+    <audio id="crystalMusic3">
+        <source src="水声 - 流水聲, 白噪音 (放松, 减压, 睡眠, 冥想).mp3" type="audio/mpeg">
+    </audio>
+    <audio id="crystalMusic4">
+        <source src="Sleepy Times - Thunderstorm for Relaxing Sleep, Pt. 11.mp3" type="audio/mpeg">
+    </audio>
+    
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/handpose"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/postprocessing/UnrealBloomPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/shaders/FXAAShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <script>
+        // 确保 raycaster 和 gestureMouse 在最顶层全局作用域定义
+        const raycaster = new THREE.Raycaster();
+        const gestureMouse = new THREE.Vector2();
+
+        // 全局变量
+        let faceDetectionReady = false;
+        let facePosition = { x: 0, y: 0 }; // 面部位置
+        let activeIslandIndex = -1; // 当前选中的小岛索引，-1表示未选中
+        let crystalBalls = []; // 存储三个水晶球
+        let islands = []; // 存储三个小岛
+        let allLilies = []; // 存储所有百合花
+        let allFireflies = []; // 存储所有萤火虫
+        let selectionParticles = []; // 存储选中效果的粒子系统
+        let handposeModel = null; // 手部检测模型
+        let isHandPinching = false; // 是否检测到捏合手势
+        let isInsideCrystalBall = false; // 是否在水晶球内部
+        let crystalBallInteractionPoints = []; // 水晶球内的交互点
+        let currentCrystalMusic = null; // 当前播放的水晶球音乐
+        let energyBars = []; // 存储能量条
+        let energyLevels = [0, 0, 0]; // 存储每个水晶球的能量值
+        let isCharging = false; // 是否正在充能
+        let currentChargingBall = -1; // 当前正在充能的水晶球索引
+
+        // 音频状态显示
+        function updateAudioStatus(message) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+        }
+
+        // 背景音乐控制
+        let backgroundMusic;
+        let crystalMusics = [];
+        let currentPhase = 0; // 当前阶段
+        let interactionCount = 0;
+        let lastMusicChangeTime = Date.now();
+        const MUSIC_CHANGE_INTERVAL = 5000; // 改为5秒
+        // 定义每个阶段需要的交互次数和对应的音乐
+        const PHASES = [
+            { interactions: 3, musicId: 'crystalMusic1' }, // 诀别书
+            { interactions: 5, musicId: 'crystalMusic2' }, // 晨鸟之歌
+            { interactions: 7, musicId: 'crystalMusic3' }  // 流水声
+        ];
+
+        async function initAudio() {
+            try {
+                updateAudioStatus('正在初始化音频...');
+                
+                // 初始化背景音乐
+                backgroundMusic = document.getElementById('backgroundMusic');
+                backgroundMusic.volume = 0.5;
+                
+                // 初始化水晶音乐
+                crystalMusics = [
+                    document.getElementById('crystalMusic1'),
+                    document.getElementById('crystalMusic2'),
+                    document.getElementById('crystalMusic3'),
+                    document.getElementById('crystalMusic4')
+                ];
+
+                // 为所有音频添加错误处理
+                const allAudios = [backgroundMusic, ...crystalMusics];
+                allAudios.forEach((audio, index) => {
+                    if (!audio) {
+                        console.error(`音频元素 ${index} 未找到`);
+                        return;
+                    }
+
+                    audio.addEventListener('error', (e) => {
+                        const errorMessage = `音频加载错误: ${e.target.src} - ${e.target.error?.message || '未知错误'}`;
+                        console.error(errorMessage);
+                        updateAudioStatus(errorMessage);
+                    });
+
+                    audio.addEventListener('canplaythrough', () => {
+                        console.log(`音频 ${index} 已加载完成`);
+                    });
+
+                    // 预加载音频
+                    audio.load();
+                });
+
+                updateAudioStatus('音频初始化完成，等待用户交互...');
+            } catch (error) {
+                const errorMessage = `音频初始化错误: ${error.message}`;
+                console.error(errorMessage);
+                updateAudioStatus(errorMessage);
+            }
+        }
+
+        // 修改音频启动函数
+        async function startAudioOnUserInteraction() {
+            const startButton = document.getElementById('audioStartButton');
+            try {
+                updateAudioStatus('正在启动音频...');
+                
+                if (backgroundMusic && backgroundMusic.paused) {
+                    await backgroundMusic.play();
+                    updateAudioStatus('音频播放中...');
+                    startButton.classList.add('hidden');
+                }
+            } catch (error) {
+                const errorMessage = `音频播放失败: ${error.message}`;
+                console.error(errorMessage);
+                updateAudioStatus(errorMessage);
+                startButton.classList.remove('hidden');
+            }
+        }
+
+        // 在页面加载完成后初始化音频
+        window.addEventListener('load', initAudio);
+
+        // 为开始按钮添加点击事件
+        document.getElementById('audioStartButton').addEventListener('click', (e) => {
+            e.preventDefault();
+            startAudioOnUserInteraction();
+        });
+
+        function checkAndChangeBackgroundMusic() {
+            const currentTime = Date.now();
+            const currentPhaseData = PHASES[currentPhase];
+            
+            // 更新状态显示
+            updateAudioStatus(`缩放交互次数: ${interactionCount}/${currentPhaseData.interactions} (${['诀别书', '晨鸟之歌', '流水声'][currentPhase]}), 冷却时间: ${Math.max(0, (MUSIC_CHANGE_INTERVAL - (currentTime - lastMusicChangeTime)) / 1000).toFixed(1)}秒`);
+            
+            // 检查是否可以切换音乐
+            if (interactionCount >= currentPhaseData.interactions && currentTime - lastMusicChangeTime >= MUSIC_CHANGE_INTERVAL) {
+                try {
+                    console.log('尝试切换音乐...');
+                    // 获取当前阶段对应的音乐
+                    const nextMusic = document.getElementById(currentPhaseData.musicId);
+                    
+                    if (nextMusic) {
+                        console.log(`切换到${['诀别书', '晨鸟之歌', '流水声'][currentPhase]}...`);
+                        // 停止当前音乐
+                        if (backgroundMusic) {
+                            backgroundMusic.pause();
+                        }
+                        
+                        // 立即播放新音乐
+                        nextMusic.volume = 0.7;
+                        nextMusic.play().then(() => {
+                            console.log('新音乐开始播放');
+                            backgroundMusic = nextMusic;
+                            updateAudioStatus(`正在播放: ${['诀别书', '晨鸟之歌', '流水声'][currentPhase]}`);
+                            
+                            // 进入下一个阶段
+                            currentPhase = (currentPhase + 1) % PHASES.length;
+                        }).catch(error => {
+                            console.error('音乐切换失败:', error);
+                            updateAudioStatus('音乐切换失败');
+                        });
+                        
+                        // 重置计数器
+                        interactionCount = 0;
+                        lastMusicChangeTime = currentTime;
+                    }
+                } catch (error) {
+                    console.error('音乐切换过程出错:', error);
+                    updateAudioStatus('音乐切换出错');
+                }
+            }
+        }
+
+        function onMouseClick(event) {
+            const mouse = new THREE.Vector2(
+                (event.clientX / window.innerWidth) * 2 - 1,
+                -(event.clientY / window.innerHeight) * 2 + 1
+            );
+
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(mouse, camera);
+
+            const intersects = raycaster.intersectObjects(scene.children, true);
+
+            for (const intersect of intersects) {
+                if (intersect.object.userData.isCrystalBall) {
+                    const index = intersect.object.userData.index;
+                    if (!isCharging) {
+                        isCharging = true;
+                        currentChargingBall = index;
+                        interactionCount++;
+                        checkAndChangeBackgroundMusic();
+                    }
+                    break;
+                }
+            }
+        }
+
+        function onMouseWheel(event) {
+            const delta = Math.sign(event.deltaY) * 0.5;
+            camera.position.z = Math.max(2, Math.min(10, camera.position.z + delta));
+            interactionCount++;
+            checkAndChangeBackgroundMusic();
+        }
+
+        function onMouseMove(event) {
+            if (isDragging) {
+                const deltaX = event.clientX - lastMouseX;
+                const deltaY = event.clientY - lastMouseY;
+                
+                // 更新相机位置
+                camera.position.x += deltaX * 0.01;
+                camera.position.y -= deltaY * 0.01;
+                
+                // 限制相机移动范围
+                camera.position.x = Math.max(-5, Math.min(5, camera.position.x));
+                camera.position.y = Math.max(-5, Math.min(5, camera.position.y));
+                
+                lastMouseX = event.clientX;
+                lastMouseY = event.clientY;
+            }
+        }
+
+        // 加载GLTF模型的loader，声明为全局变量
+        const loader = new THREE.GLTFLoader();
+
+        // 手势识别相关变量
+        let handLandmarks = null;
+        let cursorX = 0;
+        let cursorY = 0;
+        let isClicking = false;
+        let lastClickTime = 0;
+        const CLICK_COOLDOWN = 300; // 300毫秒点击冷却时间
+        const PINCH_THRESHOLD = 0.07; // 捏合阈值 (根据实际效果调整，已从0.05提高)
+
+        // 用于手势控制旋转的变量
+        let lastIndexXForRotation = 0;
+        let isRotatingGestureActive = false; // 标志是否正在进行旋转手势
+        const ROTATION_SPEED_GESTURE = 0.08; // 手势旋转速度，从0.05提高到0.08
+
+        // 星空背景代码
+        let p5Stars = []; // 重命名为 p5Stars
+        let shootingStars = [];
+        let starCount = 500;
+        let p5Canvas;
+
+        function setup() {
+            p5Canvas = createCanvas(windowWidth, windowHeight);
+            p5Canvas.position(0, 0);
+            p5Canvas.style('z-index', '0');
+            p5Canvas.id('p5-canvas');
+            
+            // 创建星星
+            for (let i = 0; i < starCount; i++) {
+                p5Stars.push(new Star()); // 使用新的变量名
+            }
+            
+            // 初始流星
+            shootingStars.push(new ShootingStar());
+        }
+
+        function draw() {
+            clear();
+            background(0, 0, 20);
+            
+            // 绘制星星
+            for (let star of p5Stars) { // 使用新的变量名
+                star.update();
+                star.display();
+            }
+            
+            // 绘制流星
+            for (let i = shootingStars.length - 1; i >= 0; i--) {
+                shootingStars[i].update();
+                shootingStars[i].display();
+                if (shootingStars[i].isDone()) {
+                    shootingStars.splice(i, 1);
+                }
+            }
+            
+            // 随机添加流星
+            if (random() < 0.003) {
+                shootingStars.push(new ShootingStar());
+            }
+        }
+
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
+        }
+
+        function mousePressed() {
+            // 点击时添加流星
+            shootingStars.push(new ShootingStar(mouseX, mouseY));
+        }
+
+        // 星星类
+        class Star {
+            constructor() {
+                this.x = random(width);
+                this.y = random(height);
+                this.size = random(0.5, 3);
+                this.brightness = random(100, 255);
+                this.pulseSpeed = random(0.02, 0.08);
+                this.pulseOffset = random(TWO_PI);
+            }
+            
+            update() {
+                this.brightness = 150 + sin(frameCount * this.pulseSpeed + this.pulseOffset) * 105;
+            }
+            
+            display() {
+                let glowSize = this.size * 3;
+                let alpha = map(this.brightness, 50, 255, 50, 150);
+                
+                drawingContext.shadowBlur = glowSize;
+                drawingContext.shadowColor = color(255, 255, 255, alpha);
+                
+                noStroke();
+                fill(255, 255, 255, this.brightness);
+                ellipse(this.x, this.y, this.size);
+                
+                drawingContext.shadowBlur = 0;
+            }
+        }
+
+        // 流星类
+        class ShootingStar {
+            constructor(startX, startY) {
+                if (startX && startY) {
+                    this.x = startX;
+                    this.y = startY;
+                    this.angle = random(TWO_PI);
+                } else {
+                    if (random() > 0.5) {
+                        this.x = random(width);
+                        this.y = -10;
+                    } else {
+                        this.x = -10;
+                        this.y = random(height);
+                    }
+                    this.angle = random(PI/6, PI/3);
+                }
+                
+                this.speed = random(5, 15);
+                this.length = random(30, 100);
+                this.size = random(1, 3);
+                this.life = 100;
+                this.fadeSpeed = random(1, 3);
+                this.tail = [];
+                this.maxTailLength = 20;
+            }
+            
+            update() {
+                this.x += cos(this.angle) * this.speed;
+                this.y += sin(this.angle) * this.speed;
+                
+                this.tail.push({x: this.x, y: this.y});
+                if (this.tail.length > this.maxTailLength) {
+                    this.tail.shift();
+                }
+                
+                this.life -= this.fadeSpeed;
+            }
+            
+            display() {
+                for (let i = 0; i < this.tail.length; i++) {
+                    let pos = this.tail[i];
+                    let alpha = map(i, 0, this.tail.length, 50, 255);
+                    let size = map(i, 0, this.tail.length, this.size * 0.5, this.size * 2);
+                    
+                    drawingContext.shadowBlur = size * 3;
+                    drawingContext.shadowColor = color(200, 200, 255, alpha * 0.7);
+                    
+                    fill(255, 255, 255, alpha);
+                    noStroke();
+                    ellipse(pos.x, pos.y, size);
+                    
+                    drawingContext.shadowBlur = 0;
+                }
+                
+                drawingContext.shadowBlur = this.size * 5;
+                drawingContext.shadowColor = color(255, 255, 255, 200);
+                
+                fill(255, 255, 255, this.life * 2.5);
+                ellipse(this.x, this.y, this.size * 2);
+                
+                drawingContext.shadowBlur = 0;
+            }
+            
+            isDone() {
+                return this.x > width + 50 || 
+                       this.y > height + 50 || 
+                       this.x < -50 || 
+                       this.y < -50 || 
+                       this.life <= 0;
+            }
+        }
+
+        // 初始化场景、相机和渲染器
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x002244); // 调整背景色为更亮的深蓝色
+        scene.fog = new THREE.FogExp2(0x002244, 0.015); // 降低雾效果强度
+        
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.shadowMap.enabled = true;
+        renderer.domElement.id = 'three-canvas';
+        document.body.appendChild(renderer.domElement);
+
+        // 添加水下环境光
+        const underwaterAmbientLight = new THREE.AmbientLight(0x0044aa, 0.7); // 提高强度到0.7
+        scene.add(underwaterAmbientLight);
+
+        // 添加水下方向光
+        const underwaterDirectionalLight = new THREE.DirectionalLight(0x88ccff, 1.2); // 提高强度到1.2
+        underwaterDirectionalLight.position.set(5, 10, 7);
+        underwaterDirectionalLight.castShadow = true;
+        scene.add(underwaterDirectionalLight);
+
+        // 创建水波纹效果
+        function createWaterRipples() {
+            const geometry = new THREE.PlaneGeometry(100, 100, 32, 32);
+            const material = new THREE.MeshBasicMaterial({
+                color: 0x88ccff,
+                transparent: true,
+                opacity: 0.1,
+                side: THREE.DoubleSide
+            });
+            const waterRipples = new THREE.Mesh(geometry, material);
+            waterRipples.rotation.x = Math.PI / 2;
+            waterRipples.position.y = 20;
+            scene.add(waterRipples);
+            return waterRipples;
+        }
+
+        // 创建水下粒子效果
+        function createUnderwaterParticles() {
+            const count = 500; // 增加粒子数量
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(count * 3);
+            const colors = new Float32Array(count * 3);
+            const sizes = new Float32Array(count);
+            const initialPositions = new Float32Array(count * 3); // 添加初始位置
+            const randomOffsets = new Float32Array(count); // 添加随机偏移量
+
+            for (let i = 0; i < count; i++) {
+                const i3 = i * 3;
+                // 随机位置，分布更广一些
+                positions[i3] = (Math.random() - 0.5) * 150;
+                positions[i3 + 1] = (Math.random() - 0.5) * 150;
+                positions[i3 + 2] = (Math.random() - 0.5) * 150;
+
+                initialPositions[i3] = positions[i3];
+                initialPositions[i3 + 1] = positions[i3 + 1];
+                initialPositions[i3 + 2] = positions[i3 + 2];
+
+                // 调整颜色，使其更偏向发光效果
+                const color = new THREE.Color();
+                color.setHSL(0.6 + Math.random() * 0.1, 0.8, 0.5 + Math.random() * 0.5); // 蓝色到青色，高饱和度，中高亮度
+                colors[i3] = color.r;
+                colors[i3 + 1] = color.g;
+                colors[i3 + 2] = color.b;
+
+                sizes[i] = 0.5 + Math.random() * 1.5; // 调整大小，使其更明显
+                randomOffsets[i] = Math.random() * Math.PI * 2; // 用于动画偏移
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+            const material = new THREE.PointsMaterial({
+                size: 1.0, // 基础大小
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.8, // 提高不透明度
+                blending: THREE.AdditiveBlending, // 加法混合，实现发光效果
+                depthWrite: false // 禁用深度写入，防止粒子遮挡问题
+            });
+
+            const particles = new THREE.Points(geometry, material);
+            particles.userData.initialPositions = initialPositions;
+            particles.userData.randomOffsets = randomOffsets;
+            particles.userData.sizes = sizes; // 存储原始大小
+            scene.add(particles);
+            return particles;
+        }
+
+        // 初始化水波纹和水下粒子
+        const waterRipples = createWaterRipples();
+        const underwaterParticles = createUnderwaterParticles();
+
+        // 创建地面
+        const groundGeometry = new THREE.PlaneGeometry(200, 200, 1, 1); // 很大的平面
+        const groundMaterial = new THREE.MeshStandardMaterial({
+            color: 0x3a4a5a, // 再次调亮地面的颜色
+            roughness: 0.8,
+            metalness: 0.1,
+            side: THREE.DoubleSide // 双面渲染以防万一
+        });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2; // 使平面水平
+        ground.position.y = -10; // 放置在小岛下方
+        scene.add(ground);
+
+        // 添加轨道控制器
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.minDistance = 0.1; // 允许非常靠近
+        controls.maxDistance = 150; // 允许足够远以展示所有小岛
+        controls.maxPolarAngle = Math.PI / 2;
+        controls.minPolarAngle = Math.PI / 2;
+        controls.enableZoom = true; // 启用缩放
+        controls.enablePan = false;
+        controls.autoRotate = false;
+        controls.enableRotate = false; // 禁用默认的旋转，改为手势控制
+
+        // 设置相机位置
+        camera.position.set(0, 15, 35);
+        camera.lookAt(0, 0, 0);
+
+        // 创建水晶球
+        const createCrystalBall = (color = 0x88ccff) => {
+            const group = new THREE.Group();
+            
+            // 水晶球玻璃
+            const glassGeometry = new THREE.SphereGeometry(5, 64, 64);
+            const glassMaterial = new THREE.MeshPhysicalMaterial({
+                color: color,
+                transmission: 0.92,
+                roughness: 0.15,
+                metalness: 0.0,
+                clearcoat: 0.8,
+                clearcoatRoughness: 0.2,
+                ior: 1.4,
+                thickness: 0.4,
+                envMapIntensity: 1.2,
+                transparent: true,
+                opacity: 0.75
+            });
+            const glass = new THREE.Mesh(glassGeometry, glassMaterial);
+            group.add(glass);
+            
+            // 增加发光效果
+            const glowGeometry = new THREE.SphereGeometry(5.2, 64, 64);
+            const glowMaterial = new THREE.MeshBasicMaterial({
+                color: color,
+                transparent: true,
+                opacity: 0.3,
+                side: THREE.BackSide
+            });
+            const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+            group.add(glow);
+            
+            // 底座
+            const baseGeometry = new THREE.CylinderGeometry(5.5, 6, 1, 32);
+            const baseMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xdddddd,
+                metalness: 0.7,
+                roughness: 0.3,
+                emissive: color,
+                emissiveIntensity: 0.2
+            });
+            const base = new THREE.Mesh(baseGeometry, baseMaterial);
+            base.position.y = -5.5;
+            group.add(base);
+            
+            // 八音盒机械部分
+            const mechanismGeometry = new THREE.TorusGeometry(0.5, 0.2, 16, 32);
+            const mechanismMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xaaaaaa,
+                metalness: 0.8,
+                roughness: 0.2,
+                emissive: color,
+                emissiveIntensity: 0.3
+            });
+            const mechanism = new THREE.Mesh(mechanismGeometry, mechanismMaterial);
+            mechanism.position.set(0, -4.5, 0);
+            mechanism.rotation.x = Math.PI / 2;
+            group.add(mechanism);
+            
+            // 添加水晶球内部的光
+            const pointLight = new THREE.PointLight(color, 1.2, 15);
+            pointLight.position.set(0, 0, 0);
+            group.add(pointLight);
+            
+            return group;
+        };
+
+        // 创建三个不同颜色的水晶球
+        const crystalBallColors = [0x88ccff, 0xff88cc, 0xccff88];
+        
+        // 创建小岛 - 三种不同风格
+        const createIsland = (type = 0) => {
+            const group = new THREE.Group();
+            let mountains = [];
+            
+            // 地面 - 不同颜色
+            const groundColors = [0x3a5f0b, 0x5f3a0b, 0x0b3a5f];
+            const groundGeometry = new THREE.SphereGeometry(3, 64, 64);
+            const groundMaterial = new THREE.MeshStandardMaterial({ 
+                color: groundColors[type],
+                roughness: 0.8
+            });
+            const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+            ground.scale.set(1, 0.3, 1);
+            ground.position.y = -1.5;
+            group.add(ground);
+            
+            // 根据类型创建不同风格的小岛
+            switch(type) {
+                case 0: // 原始山脉风格
+                    const mountainGeometry = new THREE.ConeGeometry(3.5, 2, 32);
+                    const mountainMaterial = new THREE.MeshStandardMaterial({ 
+                        color: 0xffffff,
+                        roughness: 0.7
+                    });
+                    
+                    for (let i = 0; i < 8; i++) {
+                        const angle = (i / 8) * Math.PI * 2;
+                        const mountain = new THREE.Mesh(mountainGeometry, mountainMaterial);
+                        mountain.position.x = Math.cos(angle) * 3.5;
+                        mountain.position.z = Math.sin(angle) * 3.5;
+                        mountain.position.y = -0.5;
+                        mountain.rotation.y = -angle;
+                        mountains.push(mountain);
+                        group.add(mountain);
+                    }
+                    break;
+                    
+                case 1: // 浮岛风格
+                    const floatingIslandCount = 5;
+                    const islandGeometry = new THREE.SphereGeometry(1, 32, 32);
+                    const islandMaterial = new THREE.MeshStandardMaterial({
+                        color: 0x8b4513,
+                        roughness: 0.8
+                    });
+                    
+                    for (let i = 0; i < floatingIslandCount; i++) {
+                        const angle = (i / floatingIslandCount) * Math.PI * 2;
+                        const radius = 2 + Math.random();
+                        const island = new THREE.Mesh(islandGeometry, islandMaterial);
+                        island.position.x = Math.cos(angle) * radius;
+                        island.position.z = Math.sin(angle) * radius;
+                        island.position.y = 1 + Math.random() * 2;
+                        island.scale.set(
+                            0.5 + Math.random() * 0.5,
+                            0.2 + Math.random() * 0.3,
+                            0.5 + Math.random() * 0.5
+                        );
+                        mountains.push(island);
+                        group.add(island);
+                    }
+                    break;
+                    
+                case 2: // 水晶风格
+                    const crystalCount = 12;
+                    const crystalGeometry = new THREE.ConeGeometry(0.5, 2, 5);
+                    const crystalMaterial = new THREE.MeshStandardMaterial({
+                        color: 0x88ffff,
+                        metalness: 0.5,
+                        roughness: 0.1
+                    });
+                    
+                    for (let i = 0; i < crystalCount; i++) {
+                        const angle = (i / crystalCount) * Math.PI * 2;
+                        const radius = 1.5 + Math.random() * 2;
+                        const crystal = new THREE.Mesh(crystalGeometry, crystalMaterial);
+                        crystal.position.x = Math.cos(angle) * radius;
+                        crystal.position.z = Math.sin(angle) * radius;
+                        crystal.position.y = 0;
+                        crystal.scale.setScalar(0.5 + Math.random());
+                        crystal.rotation.y = Math.random() * Math.PI;
+                        crystal.rotation.x = (Math.random() - 0.5) * 0.5;
+                        mountains.push(crystal);
+                        group.add(crystal);
+                    }
+                    break;
+            }
+            
+            return { group, mountains, type };
+        };
+
+        // 创建百合花
+        class LilyFlower {
+            constructor(x, z, type = 0) {
+                this.group = new THREE.Group();
+                this.group.position.set(x, -1, z);
+                this.type = type;
+                
+                // 不同类型的花有不同的颜色
+                const flowerColors = [0xffffff, 0xffcccc, 0xccffff];
+                const stemColors = [0x4caf50, 0x8bc34a, 0x009688];
+                
+                // 茎
+                const stemGeometry = new THREE.CylinderGeometry(0.05, 0.05, 1, 8);
+                const stemMaterial = new THREE.MeshStandardMaterial({ color: stemColors[type] });
+                const stem = new THREE.Mesh(stemGeometry, stemMaterial);
+                stem.position.y = 0.5;
+                this.group.add(stem);
+                
+                // 叶子
+                const leafGeometry = new THREE.SphereGeometry(0.5, 32, 32, 0, Math.PI * 2, 0, Math.PI / 2);
+                const leafMaterial = new THREE.MeshStandardMaterial({ color: stemColors[type], side: THREE.DoubleSide });
+                const leaf = new THREE.Mesh(leafGeometry, leafMaterial);
+                leaf.position.y = 0.5;
+                leaf.rotation.z = Math.PI / 4;
+                this.group.add(leaf);
+                
+                // 花蕾 (初始状态)
+                const budGeometry = new THREE.SphereGeometry(0.2, 32, 32);
+                const budMaterial = new THREE.MeshStandardMaterial({ color: flowerColors[type] });
+                this.bud = new THREE.Mesh(budGeometry, budMaterial);
+                this.bud.position.y = 1.5;
+                this.group.add(this.bud);
+                
+                // 花瓣 (初始隐藏)
+                this.petals = [];
+                const petalGeometry = new THREE.SphereGeometry(0.3, 32, 32, 0, Math.PI * 2, 0, Math.PI / 2);
+                const petalMaterial = new THREE.MeshStandardMaterial({ 
+                    color: flowerColors[type],
+                    transparent: true,
+                    opacity: 0,
+                    side: THREE.DoubleSide
+                });
+                
+                for (let i = 0; i < 6; i++) {
+                    const petal = new THREE.Mesh(petalGeometry, petalMaterial.clone());
+                    petal.rotation.y = (i / 6) * Math.PI * 2;
+                    petal.rotation.z = Math.PI / 2;
+                    petal.position.y = 1.5;
+                    this.petals.push(petal);
+                    this.group.add(petal);
+                }
+                
+                this.isBloomed = false;
+                this.bloomProgress = 0;
+            }
+            
+            update(cameraPosition) {
+                const distance = this.group.position.distanceTo(cameraPosition);
+                const shouldBloom = distance < 8;
+                
+                if (shouldBloom && !this.isBloomed) {
+                    this.bloomProgress = Math.min(this.bloomProgress + 0.02, 1);
+                    if (this.bloomProgress >= 1) this.isBloomed = true;
+                } else if (!shouldBloom && this.isBloomed) {
+                    this.bloomProgress = Math.max(this.bloomProgress - 0.02, 0);
+                    if (this.bloomProgress <= 0) this.isBloomed = false;
+                }
+                
+                // 更新花蕾和花瓣状态
+                this.bud.scale.setScalar(1 - this.bloomProgress);
+                
+                this.petals.forEach((petal, i) => {
+                    petal.material.opacity = this.bloomProgress;
+                    petal.scale.set(1, this.bloomProgress, this.bloomProgress);
+                    petal.rotation.x = Math.PI / 2 * this.bloomProgress;
+                });
+            }
+        }
+
+        // 创建萤火虫粒子
+        const createFireflies = (color = 0xffff00) => {
+            const count = 100;
+            const particles = new THREE.BufferGeometry();
+            const positions = new Float32Array(count * 3);
+            const colors = new Float32Array(count * 3);
+            const sizes = new Float32Array(count);
+            
+            const particleColor = new THREE.Color(color);
+            
+            for (let i = 0; i < count; i++) {
+                // 随机位置 (水晶球内部)
+                const radius = 2 + Math.random() * 3;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.random() * Math.PI;
+                
+                positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+                positions[i * 3 + 1] = radius * Math.cos(phi);
+                positions[i * 3 + 2] = radius * Math.sin(phi) * Math.sin(theta);
+                
+                // 颜色
+                colors[i * 3] = particleColor.r;
+                colors[i * 3 + 1] = particleColor.g;
+                colors[i * 3 + 2] = particleColor.b;
+                
+                // 随机大小
+                sizes[i] = 0.05 + Math.random() * 0.15;
+            }
+            
+            particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            particles.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            particles.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+            
+            const material = new THREE.PointsMaterial({
+                size: 0.15,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.6,
+                blending: THREE.AdditiveBlending
+            });
+            
+            const points = new THREE.Points(particles, material);
+            return points;
+        };
+
+        // 创建星空背景
+        const createStarfield = () => {
+            const count = 2000;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(count * 3);
+            
+            for (let i = 0; i < count * 3; i++) {
+                positions[i] = (Math.random() - 0.5) * 2000;
+            }
+            
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            
+            const material = new THREE.PointsMaterial({
+                size: 0.5,
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            const stars = new THREE.Points(geometry, material);
+            scene.add(stars);
+            return stars;
+        };
+
+        // 创建绿色粒子系统
+        let greenParticles;
+        
+        function createGreenParticles() {
+            const count = 450;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(count * 3);
+            const colors = new Float32Array(count * 3);
+            const initialPositions = new Float32Array(count * 3);
+            const randomOffsets = new Float32Array(count);
+            const scales = new Float32Array(count);
+            const lifetimes = new Float32Array(count);
+            
+            // 使用自然的绿色系渐变
+            const color1 = new THREE.Color(0x90EE90); // 浅绿色
+            const color2 = new THREE.Color(0x32CD32); // 柠檬绿
+            const color3 = new THREE.Color(0x228B22); // 森林绿
+            const color4 = new THREE.Color(0x98FB98); // 薄荷绿
+            
+            for (let i = 0; i < count; i++) {
+                const radius = 4 + Math.random() * 4;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.random() * Math.PI;
+                
+                const x = radius * Math.sin(phi) * Math.cos(theta);
+                const y = radius * Math.cos(phi);
+                const z = radius * Math.sin(phi) * Math.sin(theta);
+                
+                positions[i * 3] = x;
+                positions[i * 3 + 1] = y;
+                positions[i * 3 + 2] = z;
+                
+                initialPositions[i * 3] = x;
+                initialPositions[i * 3 + 1] = y;
+                initialPositions[i * 3 + 2] = z;
+                
+                randomOffsets[i] = Math.random() * Math.PI * 2;
+                scales[i] = 0.3 + Math.random() * 0.7;
+                lifetimes[i] = Math.random() * Math.PI * 2;
+                
+                const mixFactor = Math.random();
+                let finalColor;
+                if (mixFactor < 0.25) {
+                    finalColor = new THREE.Color().lerpColors(color1, color2, mixFactor * 4);
+                } else if (mixFactor < 0.5) {
+                    finalColor = new THREE.Color().lerpColors(color2, color3, (mixFactor - 0.25) * 4);
+                } else if (mixFactor < 0.75) {
+                    finalColor = new THREE.Color().lerpColors(color3, color4, (mixFactor - 0.5) * 4);
+                } else {
+                    finalColor = new THREE.Color().lerpColors(color4, color1, (mixFactor - 0.75) * 4);
+                }
+                
+                colors[i * 3] = finalColor.r;
+                colors[i * 3 + 1] = finalColor.g;
+                colors[i * 3 + 2] = finalColor.b;
+            }
+            
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            
+            const material = new THREE.PointsMaterial({
+                size: 0.1,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.8,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            
+            const particles = new THREE.Points(geometry, material);
+            particles.userData.initialPositions = initialPositions;
+            particles.userData.randomOffsets = randomOffsets;
+            particles.userData.scales = scales;
+            particles.userData.lifetimes = lifetimes;
+            
+            return particles;
+        }
+
+        // 修改选中效果的粒子系统
+        function createSelectionParticles(color) {
+            const count = 300; // 增加粒子数量
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(count * 3);
+            const colors = new Float32Array(count * 3);
+            const sizes = new Float32Array(count);
+            const velocities = new Float32Array(count * 3);
+            const lifetimes = new Float32Array(count);
+            
+            const particleColor = new THREE.Color(color);
+            
+            for (let i = 0; i < count; i++) {
+                const radius = 6 + Math.random() * 2;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.random() * Math.PI;
+                
+                positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+                positions[i * 3 + 1] = radius * Math.cos(phi);
+                positions[i * 3 + 2] = radius * Math.sin(phi) * Math.sin(theta);
+                
+                colors[i * 3] = particleColor.r;
+                colors[i * 3 + 1] = particleColor.g;
+                colors[i * 3 + 2] = particleColor.b;
+                
+                sizes[i] = 0.1 + Math.random() * 0.2;
+                
+                // 添加随机速度
+                velocities[i * 3] = (Math.random() - 0.5) * 0.02;
+                velocities[i * 3 + 1] = (Math.random() - 0.5) * 0.02;
+                velocities[i * 3 + 2] = (Math.random() - 0.5) * 0.02;
+                
+                lifetimes[i] = Math.random() * Math.PI * 2;
+            }
+            
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+            
+            const material = new THREE.PointsMaterial({
+                size: 0.2,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.6,
+                blending: THREE.AdditiveBlending
+            });
+            
+            const particles = new THREE.Points(geometry, material);
+            particles.visible = false;
+            particles.userData.velocities = velocities;
+            particles.userData.lifetimes = lifetimes;
+            particles.userData.rotationSpeed = 0;
+            particles.userData.targetRotationSpeed = 0;
+            return particles;
+        }
+
+        // 创建发光粒子系统
+        function createGlowParticles(color) {
+            const count = 200;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(count * 3);
+            const colors = new Float32Array(count * 3);
+            const sizes = new Float32Array(count);
+            
+            const particleColor = new THREE.Color(color);
+            
+            for (let i = 0; i < count; i++) {
+                const radius = 6 + Math.random() * 2;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.random() * Math.PI;
+                
+                positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+                positions[i * 3 + 1] = radius * Math.cos(phi);
+                positions[i * 3 + 2] = radius * Math.sin(phi) * Math.sin(theta);
+                
+                colors[i * 3] = particleColor.r;
+                colors[i * 3 + 1] = particleColor.g;
+                colors[i * 3 + 2] = particleColor.b;
+                
+                sizes[i] = 0.1 + Math.random() * 0.2;
+            }
+            
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+            
+            const material = new THREE.PointsMaterial({
+                size: 0.2,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.6,
+                blending: THREE.AdditiveBlending
+            });
+            
+            const particles = new THREE.Points(geometry, material);
+            particles.userData.initialPositions = positions.slice();
+            particles.userData.randomOffsets = new Float32Array(count).map(() => Math.random() * Math.PI * 2);
+            particles.userData.scales = new Float32Array(count).map(() => 0.3 + Math.random() * 0.7);
+            particles.userData.lifetimes = new Float32Array(count).map(() => Math.random() * Math.PI * 2);
+            particles.userData.isDancing = false;
+            particles.userData.danceIntensity = 0;
+            
+            return particles;
+        }
+
+        // 创建三个水晶球
+        for (let i = 0; i < 3; i++) {
+            // 创建水晶球
+            const ball = createCrystalBall(crystalBallColors[i]);
+            
+            // 设置三角形布局的位置
+            const radius = 20; // 增加间距
+            const angle = (i * Math.PI * 2 / 3) - Math.PI / 2; // 从顶部开始，逆时针排列
+            ball.position.x = Math.cos(angle) * radius;
+            ball.position.z = Math.sin(angle) * radius;
+            ball.position.y = 0; // 保持在同一水平面上
+            
+            scene.add(ball);
+            crystalBalls.push(ball);
+            
+            // 为每个水晶球添加对应颜色的发光粒子
+            const glowParticles = createGlowParticles(crystalBallColors[i]);
+            ball.add(glowParticles);
+            
+            // 创建小岛
+            const { group: islandGroup, mountains } = createIsland(i);
+            ball.add(islandGroup);
+            islands.push({ group: islandGroup, mountains });
+            
+            // 创建选中效果的粒子系统
+            const selectionParticle = createSelectionParticles(crystalBallColors[i]);
+            ball.add(selectionParticle);
+            selectionParticles.push(selectionParticle);
+            
+            // 创建萤火虫 - 不同颜色
+            const fireflyColors = [0xffff00, 0xff00ff, 0x00ffff];
+            const fireflies = createFireflies(fireflyColors[i]);
+            ball.add(fireflies);
+            allFireflies.push(fireflies);
+        }
+
+        // 添加新全局数组来存储百合花模型实例
+        let lilyModels = [];
+
+        // 加载百合花模型 (baihehua.glb)
+        loader.load('baihehua.glb', (gltf) => {
+            const lilyOriginalModel = gltf.scene;
+
+            // 遍历模型的所有网格并应用发光材质
+            lilyOriginalModel.traverse((child) => {
+                if (child.isMesh) {
+                    child.material = child.material.clone(); // 克隆材质以避免影响其他实例
+                    child.material.emissive = new THREE.Color(0xffffff); // 白色自发光
+                    child.material.emissiveIntensity = 1.0; // 提高发光强度到1.0
+                }
+            });
+
+            // 调整模型的初始缩放（根据实际模型大小可能需要调整）
+            lilyOriginalModel.scale.setScalar(2); // 初始缩放，可能需要根据模型大小调整
+
+            // 定义百合花围绕钢琴的位置
+            const positionsAroundPiano = [
+                new THREE.Vector3(5, -2, 5),  // 钢琴右前方
+                new THREE.Vector3(-5, -2, 5), // 钢琴左前方
+                new THREE.Vector3(5, -2, -5), // 钢琴右后方
+                new THREE.Vector3(-5, -2, -5) // 钢琴左后方
+            ];
+
+            positionsAroundPiano.forEach((pos) => {
+                const lilyInstance = lilyOriginalModel.clone();
+                lilyInstance.position.copy(pos);
+                // 可以添加轻微的随机旋转以增加多样性
+                lilyInstance.rotation.y = Math.random() * Math.PI * 2;
+                scene.add(lilyInstance);
+                lilyModels.push(lilyInstance); // 存储实例
+
+                // 为每个百合花添加一个点光源，增强发光效果
+                const lilyLight = new THREE.PointLight(0xffffff, 2.0, 5); // 白色光，强度提高到2.0，距离5
+                lilyLight.position.set(pos.x, pos.y + 1.5, pos.z); // 稍微高于花朵的位置
+                scene.add(lilyLight);
+            });
+
+        }, undefined, (error) => {
+            console.error('加载百合花模型时出错:', error);
+        });
+
+        // 加载钢琴模型
+        let pianoModel;
+        let pianoCrystalBall; // 新增：用于存储钢琴的水晶球
+        let pianoGroup; // 新增：用于存储钢琴和水晶球的组
+
+        loader.load('piano.glb', (gltf) => {
+            pianoModel = gltf.scene;
+            
+            // 创建一个组来包含钢琴和它的水晶球
+            pianoGroup = new THREE.Group();
+            scene.add(pianoGroup);
+
+            // 创建钢琴的水晶球
+            const pianoCrystalBallGeometry = new THREE.SphereGeometry(7, 64, 64); // 调整大小以罩住钢琴
+            const pianoCrystalBallMaterial = new THREE.MeshPhysicalMaterial({
+                color: 0x88ccff, // 淡蓝色
+                transmission: 0.95, // 高透明度
+                roughness: 0.1, // 低粗糙度
+                metalness: 0.0,
+                clearcoat: 1.0, // 清漆层
+                clearcoatRoughness: 0.2, // 清漆层粗糙度
+                ior: 1.33, // 初始折射率，水的折射率接近1.33
+                thickness: 0.5, // 初始厚度
+                envMapIntensity: 1.5, // 环境贴图强度
+                transparent: true,
+                opacity: 0.9, // 略微不透明，增强效果
+                side: THREE.FrontSide // 只渲染正面
+            });
+            pianoCrystalBall = new THREE.Mesh(pianoCrystalBallGeometry, pianoCrystalBallMaterial);
+            pianoGroup.add(pianoCrystalBall);
+
+            // 计算模型的包围盒
+            const box = new THREE.Box3().setFromObject(pianoModel);
+            const size = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            
+            // 计算缩放比例
+            const targetSize = 10;
+            const scale = targetSize / maxDim;
+            pianoModel.scale.set(scale, scale, scale);
+            
+            // 将模型放置在水晶球内部
+            pianoModel.position.set(0, -2, 0); // 相对水晶球中心的位置
+            pianoModel.rotation.y = Math.PI / 4;
+            pianoGroup.add(pianoModel); // 将钢琴添加到新组中
+            
+            // 添加钢琴周围的氛围光 (现在添加到pianoGroup，随钢琴一起移动)
+            const pianoAmbientLight = new THREE.PointLight(0x88ccff, 3.0, 25);
+            pianoAmbientLight.position.set(0, 0, 0);
+            pianoGroup.add(pianoAmbientLight);
+
+            const leftLight = new THREE.PointLight(0x88ccff, 2.5, 20);
+            leftLight.position.set(-6, 0, 0);
+            pianoGroup.add(leftLight);
+
+            const rightLight = new THREE.PointLight(0x88ccff, 2.5, 20);
+            rightLight.position.set(6, 0, 0);
+            pianoGroup.add(rightLight);
+
+            const topLight = new THREE.PointLight(0x88ccff, 2.2, 15);
+            topLight.position.set(0, 6, 0);
+            pianoGroup.add(topLight);
+
+            const frontLight = new THREE.PointLight(0x88ccff, 2.0, 15);
+            frontLight.position.set(0, 0, 6);
+            pianoGroup.add(frontLight);
+
+            const backLight = new THREE.PointLight(0x88ccff, 2.0, 15);
+            backLight.position.set(0, 0, -6);
+            pianoGroup.add(backLight);
+
+            const cornerPositions = [
+                [-4, 2, 4], [4, 2, 4],  // 前上方
+                [-4, 2, -4], [4, 2, -4], // 后上方
+                [-4, -2, 4], [4, -2, 4], // 前下方
+                [-4, -2, -4], [4, -2, -4] // 后下方
+            ];
+
+            cornerPositions.forEach(pos => {
+                const cornerLight = new THREE.PointLight(0x88ccff, 1.8, 12);
+                cornerLight.position.set(...pos);
+                pianoGroup.add(cornerLight);
+            });
+
+            // 添加钢琴周围的粒子效果 (现在添加到pianoGroup)
+            const pianoParticles = new THREE.Points(
+                new THREE.BufferGeometry(),
+                new THREE.PointsMaterial({
+                    color: 0xffd700, // 金色粒子
+                    size: 0.2,
+                    transparent: true,
+                    opacity: 0.8,
+                    blending: THREE.AdditiveBlending
+                })
+            );
+
+            // 创建粒子位置
+            const particleCount = 300; // 增加粒子数量
+            const positions = new Float32Array(particleCount * 3);
+            const initialPositions = new Float32Array(particleCount * 3);
+            const randomOffsets = new Float32Array(particleCount);
+            const colors = new Float32Array(particleCount * 3);
+            const sizes = new Float32Array(particleCount);
+
+            // 定义钢琴粒子的颜色渐变
+            const pianoParticleColors = [
+                new THREE.Color(0xffd700), // 金色
+                new THREE.Color(0xffa500), // 橙色
+                new THREE.Color(0xff69b4), // 粉红色
+                new THREE.Color(0x9370db)  // 紫色
+            ];
+
+            for (let i = 0; i < particleCount; i++) {
+                const i3 = i * 3;
+                const radius = 4 + Math.random() * 3;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.random() * Math.PI;
+
+                positions[i3] = radius * Math.sin(phi) * Math.cos(theta);
+                positions[i3 + 1] = radius * Math.cos(phi);
+                positions[i3 + 2] = radius * Math.sin(phi) * Math.sin(theta);
+
+                initialPositions[i3] = positions[i3];
+                initialPositions[i3 + 1] = positions[i3 + 1];
+                initialPositions[i3 + 2] = positions[i3 + 2];
+
+                randomOffsets[i] = Math.random() * Math.PI * 2;
+                sizes[i] = 0.1 + Math.random() * 0.3;
+
+                // 随机选择颜色
+                const colorIndex = Math.floor(Math.random() * pianoParticleColors.length);
+                const color = pianoParticleColors[colorIndex];
+                colors[i3] = color.r;
+                colors[i3 + 1] = color.g;
+                colors[i3 + 2] = color.b;
+            }
+
+            pianoParticles.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            pianoParticles.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            pianoParticles.geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+            pianoParticles.userData.initialPositions = initialPositions;
+            pianoParticles.userData.randomOffsets = randomOffsets;
+            pianoGroup.add(pianoParticles); // 将粒子添加到新组中
+            
+            // 恢复默认材质设置
+            pianoModel.traverse((child) => {
+                if (child.isMesh) {
+                    child.material = child.material.clone();
+                    child.material.emissive = new THREE.Color(0x333333);
+                    child.material.emissiveIntensity = 0.2;
+                }
+            });
+            
+            // scene.add(pianoModel); // 不再直接添加到scene，而是添加到pianoGroup
+
+            // 设置pianoGroup的初始位置，确保钢琴位于中心
+            pianoGroup.position.set(0, -2, 0); 
+
+        }, undefined, (error) => {
+            console.error('加载钢琴模型时出错:', error);
+        });
+
+        const stars = createStarfield();
+
+        // 添加辉光效果
+        const bloomParams = {
+            exposure: 1,
+            bloomStrength: 0.3,
+            bloomThreshold: 0.3,
+            bloomRadius: 0.2
+        };
+
+        const renderScene = new THREE.RenderPass(scene, camera);
+        const bloomPass = new THREE.UnrealBloomPass(
+            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            bloomParams.bloomStrength,
+            bloomParams.bloomRadius,
+            bloomParams.bloomThreshold
+        );
+
+        const composer = new THREE.EffectComposer(renderer);
+        composer.addPass(renderScene);
+        composer.addPass(bloomPass);
+
+        // 动画循环
+        const clock = new THREE.Clock();
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const delta = clock.getDelta();
+            const time = clock.getElapsedTime();
+            
+            // 确保OrbitControls的minDistance在初始化完成后生效
+            controls.minDistance = 1; // 设置最小距离为1，允许深入
+            
+            // 更新水波纹效果
+            waterRipples.material.opacity = 0.1 + Math.sin(time * 0.5) * 0.05;
+            waterRipples.position.y = 20 + Math.sin(time * 0.2) * 0.5;
+            
+            // 更新水下粒子
+            const positions = underwaterParticles.geometry.attributes.position.array;
+            for (let i = 0; i < positions.length; i += 3) {
+                positions[i + 1] += 0.02; // 向上漂浮
+                if (positions[i + 1] > 50) {
+                    positions[i + 1] = -50;
+                }
+            }
+            underwaterParticles.geometry.attributes.position.needsUpdate = true;
+        
+            // 更新水下环境光强度
+            underwaterAmbientLight.intensity = 0.7 + Math.sin(time * 0.2) * 0.1; // 调整基线值到0.7
+            
+            // 更新水下粒子 - 发光和浮动效果
+            if (underwaterParticles) {
+                const positions = underwaterParticles.geometry.attributes.position.array;
+                const colors = underwaterParticles.geometry.attributes.color.array;
+                const sizes = underwaterParticles.geometry.attributes.size.array;
+                const initialPositions = underwaterParticles.userData.initialPositions;
+                const randomOffsets = underwaterParticles.userData.randomOffsets;
+                const originalSizes = underwaterParticles.userData.sizes;
+
+                for (let i = 0; i < positions.length; i += 3) {
+                    const particleIndex = i / 3;
+                    const offset = randomOffsets[particleIndex];
+
+                    // 向上浮动，并循环回到底部
+                    positions[i + 1] = (initialPositions[i + 1] + time * 2) % 150; // 向上浮动，并在达到一定高度后循环
+                    if (positions[i + 1] > 75) { // 假设场景高度范围为 -75到75
+                        positions[i + 1] -= 150; // 重新回到下方
+                    }
+
+                    // 脉冲式发光效果：调整大小和透明度
+                    const pulse = Math.sin(time * 3 + offset) * 0.5 + 0.5; // 0.5到1.5之间波动
+                    sizes[particleIndex] = originalSizes[particleIndex] * (1 + pulse * 0.5); // 大小根据脉冲波动
+                    underwaterParticles.material.opacity = 0.6 + pulse * 0.4; // 透明度根据脉冲波动
+
+                    // 颜色微调
+                    const colorIntensity = 0.7 + Math.sin(time * 1.5 + offset) * 0.3; // 颜色亮度轻微波动
+                    colors[i] = underwaterParticles.geometry.attributes.color.array[i] * colorIntensity;
+                    colors[i + 1] = underwaterParticles.geometry.attributes.color.array[i + 1] * colorIntensity;
+                    colors[i + 2] = underwaterParticles.geometry.attributes.color.array[i + 2] * colorIntensity;
+                }
+
+                underwaterParticles.geometry.attributes.position.needsUpdate = true;
+                underwaterParticles.geometry.attributes.size.needsUpdate = true;
+                underwaterParticles.geometry.attributes.color.needsUpdate = true;
+            }
+            
+            // 更新钢琴周围的粒子效果
+            if (pianoGroup) { // 现在检查pianoGroup而不是pianoModel
+                const pianoParticles = pianoGroup.children.find(child => child instanceof THREE.Points);
+                if (pianoParticles) {
+                    const positions = pianoParticles.geometry.attributes.position.array;
+                    const initialPositions = pianoParticles.userData.initialPositions;
+                    const randomOffsets = pianoParticles.userData.randomOffsets;
+                    const colors = pianoParticles.geometry.attributes.color.array;
+
+                    for (let i = 0; i < positions.length; i += 3) {
+                        const particleIndex = i / 3;
+                        const offset = randomOffsets[particleIndex];
+            
+                        // 添加更复杂的运动模式
+                        const time1 = time * 0.5 + offset;
+                        const time2 = time * 0.3 + offset * 2;
+                        const time3 = time * 0.4 + offset * 3;
+                        
+                        positions[i] = initialPositions[i] + 
+                            Math.sin(time1) * 0.4 + 
+                            Math.cos(time2) * 0.2;
+                        positions[i + 1] = initialPositions[i + 1] + 
+                            Math.cos(time1) * 0.4 + 
+                            Math.sin(time3) * 0.2;
+                        positions[i + 2] = initialPositions[i + 2] + 
+                            Math.sin(time2) * 0.4 + 
+                            Math.cos(time3) * 0.2;
+
+                        // 添加颜色呼吸效果
+                        const colorIntensity = 0.7 + Math.sin(time * 0.5 + offset) * 0.3;
+                        colors[i] *= colorIntensity;
+                        colors[i + 1] *= colorIntensity;
+                        colors[i + 2] *= colorIntensity;
+            }
+            
+                    pianoParticles.geometry.attributes.position.needsUpdate = true;
+                    pianoParticles.geometry.attributes.color.needsUpdate = true;
+        }
+
+                // 更新氛围光强度
+                pianoGroup.children.forEach(child => { // 现在遍历pianoGroup的子元素
+                    if (child instanceof THREE.PointLight) {
+                        // 根据光源位置调整基础强度
+                        const baseIntensity = child.position.y > 0 ? 1.5 : 1.2;
+                        child.intensity = baseIntensity + Math.sin(time * 0.5) * 0.3;
+                    }
+                });
+
+                // 更新钢琴水晶球的水波纹效果
+                if (pianoCrystalBall) {
+                    pianoCrystalBall.material.ior = 1.33 + Math.sin(time * 1.5) * 0.02; // 调整折射率
+                    pianoCrystalBall.material.thickness = 0.5 + Math.cos(time * 2) * 0.1; // 调整厚度
+                }
+            }
+            
+            // 更新所有水晶球的发光粒子
+            crystalBalls.forEach((ball, index) => {
+                const particles = ball.children.find(child => child instanceof THREE.Points && child !== selectionParticles[index]);
+                if (particles) {
+                    const positions = particles.geometry.attributes.position.array;
+                    const initialPositions = particles.userData.initialPositions;
+                    const randomOffsets = particles.userData.randomOffsets;
+                    const scales = particles.userData.scales;
+                    const lifetimes = particles.userData.lifetimes;
+                    
+                    // 更新舞蹈强度
+                    if (particles.userData.isDancing) {
+                        particles.userData.danceIntensity = Math.min(particles.userData.danceIntensity + delta * 2, 1);
+                    } else {
+                        particles.userData.danceIntensity = Math.max(particles.userData.danceIntensity - delta * 2, 0);
+                    }
+                    
+                    const danceIntensity = particles.userData.danceIntensity;
+                    
+                    for (let i = 0; i < positions.length; i += 3) {
+                        const particleIndex = i / 3;
+                        const offset = randomOffsets[particleIndex];
+                        const scale = scales[particleIndex];
+                        const lifetime = lifetimes[particleIndex] + time;
+                        
+                        // 基础浮动运动
+                        const wave1 = Math.sin(time * 0.3 + offset) * 0.5 * scale;
+                        const wave2 = Math.cos(time * 0.2 + offset) * 0.4 * scale;
+                        const wave3 = Math.sin(time * 0.4 + offset * 2) * 0.3 * scale;
+                        
+                        // 舞蹈效果
+                        const danceWave1 = Math.sin(time * 2 + offset) * 1.5 * danceIntensity;
+                        const danceWave2 = Math.cos(time * 1.5 + offset) * 1.2 * danceIntensity;
+                        const danceWave3 = Math.sin(time * 2.5 + offset * 2) * 1.0 * danceIntensity;
+                        
+                        // 组合所有运动效果
+                        positions[i] = initialPositions[i] + wave1 + danceWave1;
+                        positions[i + 1] = initialPositions[i + 1] + wave2 + danceWave2;
+                        positions[i + 2] = initialPositions[i + 2] + wave3 + danceWave3;
+                    }
+                    
+                    particles.geometry.attributes.position.needsUpdate = true;
+                    
+                    // 根据舞蹈强度调整旋转速度
+                    const baseRotationSpeed = 0.03;
+                    const danceRotationSpeed = 0.15;
+                    const currentRotationSpeed = baseRotationSpeed + (danceRotationSpeed - baseRotationSpeed) * danceIntensity;
+                    
+                    particles.rotation.y = time * currentRotationSpeed;
+                    particles.rotation.x = Math.sin(time * 0.02) * 0.1 * danceIntensity;
+                }
+            });
+            
+            // 更新选中效果的粒子
+            selectionParticles.forEach((particles, index) => {
+                if (particles.visible) {
+                    const positions = particles.geometry.attributes.position.array;
+                    const velocities = particles.userData.velocities;
+                    const lifetimes = particles.userData.lifetimes;
+                    
+                    // 平滑过渡旋转速度
+                    particles.userData.rotationSpeed += (particles.userData.targetRotationSpeed - particles.userData.rotationSpeed) * 0.1;
+                    
+                    for (let i = 0; i < positions.length; i += 3) {
+                        // 更新位置
+                        positions[i] += velocities[i];
+                        positions[i + 1] += velocities[i + 1];
+                        positions[i + 2] += velocities[i + 2];
+                        
+                        // 添加波浪效果
+                        const wave = Math.sin(time * 2 + i * 0.1) * 0.2;
+                        positions[i + 1] += wave;
+                        
+                        // 限制粒子范围
+                        const radius = 8;
+                        const distance = Math.sqrt(
+                            positions[i] * positions[i] +
+                            positions[i + 1] * positions[i + 1] +
+                            positions[i + 2] * positions[i + 2]
+                        );
+                        
+                        if (distance > radius) {
+                            const scale = radius / distance;
+                            positions[i] *= scale;
+                            positions[i + 1] *= scale;
+                            positions[i + 2] *= scale;
+                            
+                            // 反转速度方向
+                            velocities[i] *= -0.5;
+                            velocities[i + 1] *= -0.5;
+                            velocities[i + 2] *= -0.5;
+                        }
+                        
+                        // 更新生命周期
+                        lifetimes[i / 3] += delta;
+                        if (lifetimes[i / 3] > Math.PI * 2) {
+                            lifetimes[i / 3] = 0;
+                    }
+                    }
+                    
+                    particles.geometry.attributes.position.needsUpdate = true;
+                    
+                    // 应用旋转
+                    particles.rotation.y += particles.userData.rotationSpeed * delta;
+                    particles.rotation.x = Math.sin(time * 0.5) * 0.1;
+                }
+            });
+            
+            // 更新控制器
+            controls.update();
+            
+            // 旋转水晶球
+            crystalBalls.forEach((ball, i) => {
+                ball.rotation.y = time * 0.1 * (i * 0.5 + 0.5);
+            });
+            
+            // 更新百合花状态
+            allLilies.forEach((lilies, i) => {
+                lilies.forEach(lily => lily.update(camera.position));
+            });
+            
+            // 移动萤火虫粒子
+            allFireflies.forEach(fireflies => {
+                const positions = fireflies.geometry.attributes.position.array;
+                for (let i = 0; i < positions.length; i += 3) {
+                    // 随机移动
+                    positions[i] += (Math.random() - 0.5) * 0.02;
+                    positions[i + 1] += (Math.random() - 0.5) * 0.02;
+                    positions[i + 2] += (Math.random() - 0.5) * 0.02;
+                    
+                    // 限制在水晶球内
+                    const vec = new THREE.Vector3(positions[i], positions[i + 1], positions[i + 2]);
+                    if (vec.length() > 4.5) {
+                        vec.normalize().multiplyScalar(4.5);
+                        positions[i] = vec.x;
+                        positions[i + 1] = vec.y;
+                        positions[i + 2] = vec.z;
+                    }
+                }
+                fireflies.geometry.attributes.position.needsUpdate = true;
+            });
+            
+            // 渲染场景
+            composer.render();
+        }
+
+        // 处理窗口大小变化
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // 添加GSAP动画库
+        function loadScript(url) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = url;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+
+        // 修改初始化函数
+        async function init() {
+            try {
+                // 加载GSAP库
+                await loadScript('https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.4/gsap.min.js');
+                
+                // 初始化手势识别
+                await initHandTracking();
+                
+                // 初始化手部检测
+                await initHandDetection();
+                
+                // 开始动画
+                animate();
+            } catch (err) {
+                console.error('初始化错误:', err);
+                // 在状态栏显示错误信息，而不是使用加载提示
+                const status = document.getElementById('status');
+                status.textContent = '加载失败: ' + err.message;
+                status.style.backgroundColor = 'rgba(255,0,0,0.5)'; // 错误状态使用红色背景
+            }
+        }
+
+        // 修改手势识别初始化函数
+        async function initHandTracking() {
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('hand-canvas');
+            const status = document.getElementById('status');
+            const cursorElement = document.getElementById('cursor');
+            
+            try {
+                status.textContent = '正在初始化摄像头...';
+                
+                // 设置canvas尺寸
+                canvas.width = 320;
+                canvas.height = 240;
+                
+                // 初始化MediaPipe Hands
+                const hands = new Hands({
+                    locateFile: (file) => {
+                        return `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${file}`;
+                    }
+                });
+                
+                hands.setOptions({
+                    maxNumHands: 2, // 支持双手
+                    modelComplexity: 0, // 降低模型复杂度以提高响应速度
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.5
+                });
+                
+                // 添加手势控制变量
+                let lastIndexX = 0;
+                let isDragging = false;
+                const rotationSpeed = 0.02; // 调整旋转速度
+                let lastLeftHandDistance = null;
+                let lastZoom = controls.getDistance ? controls.getDistance() : camera.position.distanceTo(new THREE.Vector3(0,0,0));
+                
+                // 处理检测结果
+                hands.onResults((results) => {
+                    const ctx = canvas.getContext('2d');
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    
+                    if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                        // 先区分左右手
+                        let rightHand = null, leftHand = null;
+                        if (results.multiHandedness && results.multiHandedness.length === results.multiHandLandmarks.length) {
+                            for (let i = 0; i < results.multiHandedness.length; i++) {
+                                const label = results.multiHandedness[i].label;
+                                if (label === 'Right') rightHand = results.multiHandLandmarks[i];
+                                if (label === 'Left') leftHand = results.multiHandLandmarks[i];
+                            }
+                        } else {
+                            // 兼容性兜底
+                            rightHand = results.multiHandLandmarks[0];
+                        }
+                        // 右手：原有交互
+                        if (rightHand) {
+                            handLandmarks = rightHand;
+                            const indexTip = rightHand[8];
+                            const indexPip = rightHand[6];
+                            const thumbTip = rightHand[4];
+                            cursorX = (1 - indexTip.x) * window.innerWidth;
+                            cursorY = indexTip.y * window.innerHeight;
+                            cursorElement.style.transform = `translate(${cursorX}px, ${cursorY}px)`;
+                            const dist = Math.sqrt(
+                                Math.pow(thumbTip.x - indexTip.x, 2) +
+                                Math.pow(thumbTip.y - indexTip.y, 2) +
+                                Math.pow(thumbTip.z - indexTip.z, 2)
+                            );
+                            const currentTime = Date.now();
+                            const isIndexUp = indexTip.y < indexPip.y;
+                            if (isIndexUp) {
+                                if (!isRotatingGestureActive) {
+                                    lastIndexXForRotation = indexTip.x * canvas.width;
+                                    isRotatingGestureActive = true;
+                                }
+                                const currentIndexX = indexTip.x * canvas.width;
+                                const deltaXForRotation = currentIndexX - lastIndexXForRotation;
+                                if (Math.abs(deltaXForRotation) > 0.5) {
+                                    scene.rotation.y -= deltaXForRotation * ROTATION_SPEED_GESTURE;
+                                }
+                                lastIndexXForRotation = currentIndexX;
+                                status.textContent = '正在旋转场景...';
+                                isClicking = false; 
+                                cursorElement.style.background = 'rgba(255, 255, 255, 0.8)';
+                            } else {
+                                isRotatingGestureActive = false;
+                                if (dist < PINCH_THRESHOLD && !isClicking && (currentTime - lastClickTime > CLICK_COOLDOWN)) {
+                                    isClicking = true;
+                                    lastClickTime = currentTime;
+                                    handleGestureClick(cursorX, cursorY);
+                                    status.textContent = '检测到点击!';
+                                    cursorElement.style.background = 'rgba(255, 255, 0, 0.8)';
+                                } else if (dist >= PINCH_THRESHOLD && isClicking) {
+                                    isClicking = false;
+                                    status.textContent = '准备就绪 - 右手食指移动光标，捏合点击/抬起旋转，左手缩放';
+                                    cursorElement.style.background = 'rgba(255, 255, 255, 0.8)';
+                                } else if (!isClicking) {
+                                    status.textContent = '准备就绪 - 右手食指移动光标，捏合点击/抬起旋转，左手缩放';
+                                }
+                            }
+                            drawConnectors(ctx, rightHand, HAND_CONNECTIONS, {
+                                color: isIndexUp ? '#00FF00' : '#FF0000',
+                                lineWidth: 2
+                            });
+                            drawLandmarks(ctx, rightHand, {
+                                color: isIndexUp ? '#00FF00' : '#FF0000',
+                                lineWidth: 1
+                            });
+                        }
+                        // 左手：缩放
+                        if (leftHand) {
+                            // 只画左手为蓝色
+                            drawConnectors(ctx, leftHand, HAND_CONNECTIONS, {
+                                color: '#00BFFF',
+                                lineWidth: 2
+                            });
+                            drawLandmarks(ctx, leftHand, {
+                                color: '#00BFFF',
+                                lineWidth: 1
+                            });
+                            // 检测左手大拇指和食指距离
+                            const leftThumbTip = leftHand[4];
+                            const leftIndexTip = leftHand[8];
+                            const leftDist = Math.sqrt(
+                                Math.pow(leftThumbTip.x - leftIndexTip.x, 2) +
+                                Math.pow(leftThumbTip.y - leftIndexTip.y, 2) +
+                                Math.pow(leftThumbTip.z - leftIndexTip.z, 2)
+                            );
+                            // 设定缩放映射区间
+                            const minDist = 0.03, maxDist = 0.18;
+                            const minZoom = 12, maxZoom = 45; // 你可以根据场景调整
+                            // 距离越大，视角越广（缩小），距离越小，视角越窄（放大）
+                            let mappedZoom = minZoom + (maxZoom - minZoom) * (leftDist - minDist) / (maxDist - minDist);
+                            mappedZoom = Math.max(minZoom, Math.min(maxZoom, mappedZoom));
+                            // 平滑缩放
+                            if (isFinite(mappedZoom)) {
+                                camera.fov += (mappedZoom - camera.fov) * 0.2;
+                                camera.updateProjectionMatrix();
+                                status.textContent = '左手缩放: ' + mappedZoom.toFixed(1);
+                            }
+                        }
+                    } else {
+                        handLandmarks = null;
+                        status.textContent = '请将手掌放在摄像头前';
+                        cursorElement.style.transform = `translate(-100px, -100px)`;
+                        isClicking = false;
+                        isRotatingGestureActive = false;
+                    }
+                });
+                
+                // 启动摄像头
+                const mediaPipeCamera = new Camera(video, {
+                    onFrame: async () => {
+                        await hands.send({image: video});
+                    },
+                    width: 320,
+                    height: 240
+                });
+                
+                await mediaPipeCamera.start();
+                status.textContent = '准备就绪 - 右手食指移动光标，捏合点击/抬起旋转，左手缩放';
+                status.style.backgroundColor = 'rgba(0,255,0,0.3)';
+                
+            } catch (err) {
+                console.error('手势识别初始化失败:', err);
+                status.textContent = '初始化失败: ' + err.message;
+                status.style.backgroundColor = 'rgba(255,0,0,0.5)';
+                throw err;
+            }
+        }
+
+        // 修改视频初始化函数
+        async function initVideo() {
+            try {
+                const video = document.getElementById('video');
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        aspectRatio: { ideal: 16/9 }
+                    }
+                });
+                video.srcObject = stream;
+                await video.play();
+                
+                // 确保视频容器保持正确的宽高比
+                const videoContainer = document.getElementById('video-container');
+                videoContainer.style.aspectRatio = `${video.videoWidth}/${video.videoHeight}`;
+                
+                // 初始化手部跟踪
+                initHandTracking();
+            } catch (err) {
+                console.error('摄像头访问错误:', err);
+                document.getElementById('status').textContent = '无法访问摄像头';
+            }
+        }
+
+        // 添加火柴堆类
+        class FirePit {
+            constructor() {
+                this.group = new THREE.Group();
+                
+                // 创建火堆底座
+                const baseGeometry = new THREE.CylinderGeometry(1, 1.2, 0.3, 32);
+                const baseMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x333333,
+                    roughness: 0.8,
+                    metalness: 0.2
+                });
+                const base = new THREE.Mesh(baseGeometry, baseMaterial);
+                base.position.y = -2.2;
+                this.group.add(base);
+                
+                // 创建木柴
+                const logCount = 8;
+                const logGeometry = new THREE.CylinderGeometry(0.1, 0.1, 1, 8);
+                const logMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x4a2f1b,
+                    roughness: 0.9,
+                    metalness: 0.1
+                });
+                
+                for (let i = 0; i < logCount; i++) {
+                    const log = new THREE.Mesh(logGeometry, logMaterial);
+                    const angle = (i / logCount) * Math.PI * 2;
+                    const radius = 0.4;
+                    log.position.set(
+                        Math.cos(angle) * radius,
+                        -1.8,
+                        Math.sin(angle) * radius
+                    );
+                    log.rotation.x = Math.PI / 2;
+                    log.rotation.z = angle;
+                    this.group.add(log);
+                }
+                
+                // 创建火焰粒子系统
+                const particleCount = 100;
+                const geometry = new THREE.BufferGeometry();
+                const positions = new Float32Array(particleCount * 3);
+                const colors = new Float32Array(particleCount * 3);
+                const sizes = new Float32Array(particleCount);
+                
+                for (let i = 0; i < particleCount; i++) {
+                    const i3 = i * 3;
+                    positions[i3] = (Math.random() - 0.5) * 0.5;
+                    positions[i3 + 1] = Math.random() * 1.5;
+                    positions[i3 + 2] = (Math.random() - 0.5) * 0.5;
+                    
+                    colors[i3] = 1; // 红色
+                    colors[i3 + 1] = 0.3 + Math.random() * 0.2; // 绿色
+                    colors[i3 + 2] = 0.1; // 蓝色
+                    
+                    sizes[i] = 0.1 + Math.random() * 0.2;
+                }
+                
+                geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+                geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+                
+                const material = new THREE.PointsMaterial({
+                    size: 0.2,
+                    vertexColors: true,
+                    transparent: true,
+                    opacity: 0.8,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                });
+                
+                this.fireParticles = new THREE.Points(geometry, material);
+                this.fireParticles.position.y = -1.5;
+                this.group.add(this.fireParticles);
+                
+               
+           
+                  
+                
+                // 平滑过渡光源强度
+                this.currentIntensity += (this.targetIntensity - this.currentIntensity) * 0.1;
+                this.light.intensity = this.currentIntensity;
+            }
+            
+            toggle() {
+                this.isLit = !this.isLit;
+                this.targetIntensity = this.isLit ? 1.5 : 0;
+            }
+        }
+
+       
+
+        // 修改点击事件处理函数以接收手势光标位置
+        function handleGestureClick(screenX, screenY) {
+            // 将屏幕坐标转换为 Three.js 的归一化设备坐标 (NDC)
+            gestureMouse.x = (screenX / window.innerWidth) * 2 - 1;
+            gestureMouse.y = -(screenY / window.innerHeight) * 2 + 1; // Y轴反转
+            
+            raycaster.setFromCamera(gestureMouse, camera);
+            
+            const intersects = raycaster.intersectObjects(crystalBalls, true);
+            if (intersects.length > 0) {
+                const clickedBall = crystalBalls.find(ball => 
+                    ball.children.includes(intersects[0].object) || 
+                    ball.children.some(child => child.children.includes(intersects[0].object))
+                );
+                
+                if (clickedBall) {
+                    const newIndex = crystalBalls.indexOf(clickedBall);
+                    
+                    if (newIndex === activeIslandIndex) {
+                        // 取消选中
+                        selectionParticles[activeIslandIndex].visible = false;
+                        selectionParticles[activeIslandIndex].userData.targetRotationSpeed = 0;
+                        const particles = crystalBalls[activeIslandIndex].children.find(
+                            child => child instanceof THREE.Points && child !== selectionParticles[activeIslandIndex]
+                        );
+                        if (particles) {
+                            particles.userData.isDancing = false;
+                            particles.userData.danceIntensity = 0;
+                        }
+                        activeIslandIndex = -1;
+                    } else {
+                        // 取消之前选中的小岛
+                        if (activeIslandIndex !== -1) {
+                            selectionParticles[activeIslandIndex].visible = false;
+                            selectionParticles[activeIslandIndex].userData.targetRotationSpeed = 0;
+                            const particles = crystalBalls[activeIslandIndex].children.find(
+                                child => child instanceof THREE.Points && child !== selectionParticles[activeIslandIndex]
+                            );
+                            if (particles) {
+                                particles.userData.isDancing = false;
+                                particles.userData.danceIntensity = 0;
+                            }
+                        }
+                        
+                        // 设置新的选中状态
+                        activeIslandIndex = newIndex;
+                        selectionParticles[activeIslandIndex].visible = true;
+                        selectionParticles[activeIslandIndex].userData.targetRotationSpeed = 0.5;
+                        const particles = crystalBalls[activeIslandIndex].children.find(
+                            child => child instanceof THREE.Points && child !== selectionParticles[activeIslandIndex]
+                        );
+                        if (particles) {
+                            particles.userData.isDancing = true;
+                            particles.userData.danceIntensity = 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 初始化手部检测
+        async function initHandDetection() {
+            handposeModel = await handpose.load();
+            console.log('Hand detection model loaded');
+        }
+
+        // 检测手部动作
+        async function detectHands() {
+            if (!handposeModel) return;
+            
+            const predictions = await handposeModel.estimateHands(video);
+            if (predictions.length > 0) {
+                const hand = predictions[0];
+                const thumbTip = hand.annotations.thumb[3];
+                const indexTip = hand.annotations.indexFinger[3];
+                
+                // 计算大拇指和食指指尖之间的距离
+                const distance = Math.sqrt(
+                    Math.pow(thumbTip[0] - indexTip[0], 2) + 
+                    Math.pow(thumbTip[1] - indexTip[1], 2)
+                );
+                
+                // 如果距离小于阈值，认为是捏合状态
+                isHandPinching = distance < 30;
+            } else {
+                isHandPinching = false;
+            }
+        }
+
+        // 启动应用
+        init();
+
+        function createCrystalBalls() {
+            const crystalGeometry = new THREE.SphereGeometry(1, 32, 32);
+            const crystalMaterial = new THREE.MeshPhongMaterial({
+                color: 0x88ccff,
+                transparent: true,
+                opacity: 0.6,
+                shininess: 100
+            });
+
+            for (let i = 0; i < 3; i++) {
+                const crystalBall = new THREE.Mesh(crystalGeometry, crystalMaterial);
+                crystalBall.position.set((i - 1) * 3, 0, -5);
+                crystalBall.userData.isCrystalBall = true;
+                crystalBall.userData.index = i;
+                scene.add(crystalBall);
+                crystalBalls.push(crystalBall);
+
+                // 创建能量条
+                const energyBarGeometry = new THREE.BoxGeometry(0.3, 1, 0.3); // 增加能量条的尺寸
+                const energyBarMaterial = new THREE.MeshPhongMaterial({
+                    color: 0x00ffff,
+                    transparent: true,
+                    opacity: 0.9,
+                    emissive: 0x00ffff,
+                    emissiveIntensity: 1
+                });
+                const energyBar = new THREE.Mesh(energyBarGeometry, energyBarMaterial);
+                energyBar.position.set(0, 2, 0); // 调整位置到水晶球上方
+                energyBar.userData.isEnergyBar = true;
+                energyBar.userData.index = i;
+                crystalBall.add(energyBar);
+                energyBars.push(energyBar);
+
+                // 添加能量条底座
+                const baseGeometry = new THREE.BoxGeometry(0.4, 0.1, 0.4);
+                const baseMaterial = new THREE.MeshPhongMaterial({
+                    color: 0x88ccff,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                const base = new THREE.Mesh(baseGeometry, baseMaterial);
+                base.position.set(0, 1.5, 0);
+                crystalBall.add(base);
+            }
+        }
+
+        // 修改更新能量条的函数
+        function updateEnergyBars() {
+            if (isCharging && currentChargingBall !== -1) {
+                energyLevels[currentChargingBall] += 0.02; // 加快充能速度
+                if (energyLevels[currentChargingBall] >= 1) {
+                    // 能量充满，播放音乐
+                    if (currentCrystalMusic) {
+                        currentCrystalMusic.pause();
+                    }
+                    const randomMusic = crystalMusics[Math.floor(Math.random() * crystalMusics.length)];
+                    randomMusic.currentTime = 0;
+                    randomMusic.play();
+                    currentCrystalMusic = randomMusic;
+                    
+                    // 重置能量状态
+                    isCharging = false;
+                    currentChargingBall = -1;
+                    energyLevels = [0, 0, 0];
+                }
+                
+                // 更新能量条显示
+                energyBars.forEach((bar, index) => {
+                    const scale = energyLevels[index];
+                    bar.scale.y = scale;
+                    bar.position.y = 1.5 + (scale * 0.5); // 调整位置计算
+                    
+                    // 添加发光效果
+                    if (scale > 0) {
+                        bar.material.emissiveIntensity = 1 + scale;
+                    }
+                });
+            }
+        }
+    </script>
+</body>
+</html> 
